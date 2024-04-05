@@ -3,7 +3,7 @@ import { createSlice } from "@reduxjs/toolkit"
 
 const userReducer = createSlice({
   name: "user",
-  initialState: { field: "", user: null },
+  initialState: { field: "", user: null, loggedin: false },
   reducers: {
     setField: (state, action) => {
       state.field = action.payload
@@ -18,10 +18,13 @@ const userReducer = createSlice({
     loadUser: (state, action) => {
       const suser = localStorage.getItem("user")
       state.user = JSON.parse(suser)
+    },
+    setLoggedIn: (state, action) => {
+      state.loggedin = action.payload
     }
   }
 })
 
-export const { setUser, setField, loadUser } = userReducer.actions
+export const { setUser, setField, loadUser, setLoggedIn } = userReducer.actions
 
 export default userReducer.reducer;

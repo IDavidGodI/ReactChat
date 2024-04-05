@@ -1,9 +1,13 @@
 import axios from "axios"
 import environment from "../utils/environment"
 
-const getChats = async () => {
-  const res = await axios.get(`${environment.server}/chats`)
+const getChats = async (user) => {
+  const res = await axios.get(`${environment.server}/chats`, {params: {user}})
   return res.data
 }
 
-export default { getChats }
+const getMessages = async (chatId) => {
+  const res = await axios.get(`${environment.server}/chats/${chatId}`)
+  return res.data
+}
+export default { getChats, getMessages }

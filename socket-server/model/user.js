@@ -8,6 +8,10 @@ const userSchema = new mongoose.Schema({
     unique: true,
     minLength: 3
   },
+  chats: [{
+    type: mongoose.Types.ObjectId,
+    ref: "Chat"
+  }]
 })
 
 userSchema.set("toJSON", {
