@@ -35,7 +35,7 @@ app.get("/", async (req, res) => {
   console.log(user)
 })
 
-app.get("/:user", async (req, res) => {
+app.post("/:user", async (req, res) => {
   const saved = await User.create({userName: req.params.user})
   
   res.json(saved)
