@@ -30,7 +30,7 @@ app.use("/chats", chatRouter)
 
 app.get("/", async (req, res) => {
   const users = await User.find({})
-  const user = users[0].toJSON();
+  const user = users[0]?.toJSON();
   
   console.log(user)
 })
