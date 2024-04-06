@@ -41,8 +41,7 @@ const Login = () => {
   return (
     <div className="flex w-14 flex-col justify-center items-center">
       <h1 className="text-6xl text-wrap text-center m-4">Welcome to the ReactiveChat</h1>
-    <form className="flex flex-col bg-teal-900 p-10  rounded " onSubmit={handleSubmit}>
-
+      <form className="flex flex-col bg-teal-900 p-10  rounded " onSubmit={handleSubmit}>
         <input 
           className="
             flex-row w-80 bg-teal-100 mb-2 text-teal-900 focus focus:outline-teal-400 focus:outline focus:outline-1 placeholder-gray-600 rounded p-1"
@@ -51,8 +50,8 @@ const Login = () => {
             onChange={e => dispatch(setField(e.target.value))} placeholder="Username" 
         />
 
-      <input className="bg-emerald-800 hover:bg-emerald-700 p-2 px-4 rounded" value="Login" type="submit" />
-    </form>
+        <input className="bg-amber-400 hover:bg-amber-300 p-2 px-4 rounded" value="Login" type="submit" />
+      </form>
     </div>
   )
 }
@@ -60,13 +59,16 @@ const Login = () => {
 const ChatButton = ({ user }) => {
   const dispatch = useDispatch()
   const {selectedChat} = useSelector(state => state.chat)
+  const notification = user.new_messages>0
   const handleSelection = () => {
     if (selectedChat===user.id) dispatch(setSelectedChat(null))
     else dispatch(setSelectedChat(user.id))
+    if (notification)
+
     dispatch(setMessage(""))
   }
   const ligth = user.online? 
-    600 : user.new_messages>0? 
+    600 : notification? 
       700 : 800
   return (
     <div className={`flex flex-row h-50 bg-teal-${user.online? 800 : 900} w-full hover:bg-teal-950 justify-center border-teal-${user.online? 600 : 700} border-b-2 `}>
@@ -75,8 +77,8 @@ const ChatButton = ({ user }) => {
           <h5 className="text-xl text-teal-300">{user.userName}</h5>
         <p className={`text-teal-${ligth-100}`} >{user.online ? "online" : "offline"}</p>
       </div >
-      {user.messages>0 && 
-      <div className="flex items-center">
+      {notification && 
+      <div className="flex items-center p-2">
 
         <div className="flex items-center justify-center px-3 p-1 bg-teal-500 rounded-full">
           <p className="font-bold text-teal-800">{user.new_messages}</p>
@@ -125,10 +127,9 @@ const Message = ({ message, person }) => {
 
 
       ): null
-  
-      console.log(icon)
+
   return (
-    <div className={`rounded w-2/5 p-4 shadow-xl mb-2 ${colors.messageBg} ${colors.position}`}>
+    <div className={`rounded w-2/5 p-3 shadow-xl mb-2 ${colors.messageBg} ${colors.position}`}>
       <div className="px-2">
         <p>{message.content}</p>
       </div>
@@ -164,7 +165,7 @@ const MessagesDisplay = ({user}) => {
     if (selectedChat){
       messages.refetch()
     }
-  }, [selectedChat])
+  }, [selectedChat, users])
 
   useMemo(()=>{
     const not_read = messages.data.find(m => m.status!=="read" && m.to===user.id)
@@ -178,12 +179,8 @@ const MessagesDisplay = ({user}) => {
     }
   }, [messages])
 
-
-  if (messages.isError){
-    queryClient.refetchQueries({exact:["chats"]})
-  }
   return (
-    <div className="h-4/5 px-10 overflow-auto">
+    <div className="py-5 px-10 grow overflow-y-auto">
       {
         messages.isSuccess &&
         messages.data.map(message => <Message key={message._id} message={message} person={selectedChat} />)
@@ -206,7 +203,6 @@ const MessageBox = ({ user }) => {
       content: messageBox,
       timeStamp: timeStamp
     })
-    console.log("emitiendo")
     const chats = [...queryClient.getQueryData(["chats"])]
     const updateChat = chats.findIndex(c => c.id === selectedChat)
     chats[updateChat] = {...chats[updateChat], last_activity: timeStamp}
@@ -224,7 +220,7 @@ const MessageBox = ({ user }) => {
           onChange={(e) => dispatch(setMessage(e.target.value))}
           />
         <div>
-          <div className="flex items-center">
+          <div className="m-3 flex items-center">
 
         <button className="bg-teal-700 rounded-full p-2.5 rounded-full hover:bg-teal-500" type="submit" disabled={messageBox.length===0} >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
@@ -240,18 +236,29 @@ const MessageBox = ({ user }) => {
 }
 const Chat = ({ to, user }) => {
   const queryClient = useQueryClient();
-  const {selectedChat} = useSelector(state => state.chat)
+  const dispatch = useDispatch()
   useEffect(()=>{
     return ()=>{
       queryClient.setQueryData(["messagesHistory"], [])
     }
   },[])
-
+  const closeChat = ()=> {  
+    dispatch(setSelectedChat(null))
+  }
 
   return (
-    <div className="flex flex-col w-full  h-full justify-between">
-      <div className="flex justify-center items-center border-b-teal-800 py-10 h-1">
-        <h3 className="text-2xl">{to.userName}</h3>
+    <div className="flex flex-col h-full w-full justify-between">
+      <div className="flex justify-start bg-emerald-900 items-center border-b-teal-800 py-10 h-1">
+        <button onClick={closeChat} className="rounded-full m-2 p-2 hover:bg-emerald-950">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+        </svg>
+
+        </button>
+        <div className="flex justify-center grow items-center h-full">
+          <h3 className="text-2xl">{to.userName}</h3>
+
+        </div>
       </div>
       <MessagesDisplay user={user}/>
       <MessageBox user={user} />
@@ -278,16 +285,15 @@ const ChatPage = () => {
   useEffect(() => {
     socket.on("state_change", async () => {
       const {selectedChat} = store.getState().chat
-      const res = await chatService.getChats(localUser)
       const { data } = await chats.refetch()
       const selectedUser = data.find(d => d.id===selectedChat)
-      console.log("estado cambiado")
       if (!selectedUser) dispatch(setSelectedChat(null))
     })
 
-    socket.on("message", message => {
+    socket.on("message", (message) => {
       const messagesHistory = queryClient.getQueryData(["messagesHistory"])
       const { selectedChat } = store.getState().chat
+      
       const isChat = selectedChat===message.from || localUser.id===message.from
       if (message.from!==localUser.id)
         socket.emit("message_status", {
@@ -295,10 +301,15 @@ const ChatPage = () => {
           messageId: message._id,
           status: isChat? "read" : "received"
         })
-      if (isChat){
-        console.log("nuevo mensaje renderizado")
 
-        queryClient.setQueryData(["messagesHistory"], messagesHistory.concat(message))
+      console.log("actualizando mensajes", message)
+      if (isChat){
+
+        if (!message.chatCreated){
+          queryClient.setQueryData(["messagesHistory"], messagesHistory.concat(message))
+        }
+        else chats.refetch()
+
         return
       }
       
@@ -337,8 +348,8 @@ const ChatPage = () => {
     )
   }
   return (
-  <div className="flex flex-col h-screen items-start">
-  <div className="flex w-screen justify-between px-4 bg-teal-800">
+  <div className="flex flex-col h-full w-full items-start">
+  <div className="flex w-full justify-between border-b-2 border-teal-950 shadow-b-xl px-4 bg-teal-800">
     <div className="flex items-center bg-teal-900 py-2 px-4">
       <div className="rounded-full p-2 bg-emerald-900">
         <svg  xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
@@ -353,14 +364,19 @@ const ChatPage = () => {
     <button className="bg-emerald-800 font-bold hover:bg-emerald-700 p-2 px-4 rounded" onClick={handleLogout}>Logout</button>
 
   </div>
-    <div className="flex flex-row w-screen h-full">
-      <div className="w-1/5 flex flex-col items-start h-full bg-teal-900">
+    <div className="flex h-full w-full">
+      <div className="w-1/5 flex flex-col items-start bg-teal-900 shadow-lg">
         {chats.isSuccess && chat_list.map(user => <ChatButton key={user.id} user={user} />)
         }
       </div>
-      <div className="h-full w-4/5">
-        {selectedChat && chats.isSuccess &&
+      <div className="w-4/5">
+        {selectedChat && chats.isSuccess?
           <Chat to={chat_list.find(u => u.id === selectedChat)} user={localUser} />
+          :
+          <div className="flex w-full h-full items-center justify-center">
+            <h3 className="text-teal-800 font-bold text-2xl">No chat selected</h3>
+
+          </div>
         }
       </div>
     </div>
@@ -395,7 +411,7 @@ const App = () => {
     })
   }, [user])
   return (
-    <div className="h-screen bg-teal-950 text-white flex items-center justify-center">
+    <div className="h-screen w-screen bg-teal-950 text-white flex items-center justify-center">
       <Routes>
         <Route path="/" element={loggedin ? <Navigate replace to="/login" /> : <Navigate replace to="/chats" />} />
         <Route path="/login" element={!loggedin ? <Login /> : <Navigate replace to="/chats" />} />

@@ -85,8 +85,8 @@ const init = (server) => {
       
       if (from_user) {
         let chat = await getUsersDirectChat(message.from, message.to)
-        const createChat = !chat
-        if (createChat){
+        const chatCreated = !chat
+        if (chatCreated){
           const users = await User.find({$or: [{_id: message.from},{_id: message.to}]})
           const newChat = new Chat({users})
           chat = await newChat.save()
@@ -104,7 +104,7 @@ const init = (server) => {
           to_notify = to_notify.concat(to_sockets)
         }
         to_notify.forEach(s => {
-          s.emit("message", db_message)
+          s.emit("message", {...db_message.toJSON(), chatCreated})
         });
       }
   
@@ -112,6 +112,7 @@ const init = (server) => {
   
     socket.on("message_status", async (payload) => {
       const chat = await getUsersDirectChat(...payload.users)
+      if (!chat) return
       if (payload.messageId){
         const message = chat.messages.find(m => payload.messageId===m._id.toJSON())
         message.status = payload.status
@@ -122,7 +123,6 @@ const init = (server) => {
         message.forEach(m => {
           m.status = payload.status
         })
-        console.log("messages: ",message)
 
       }
       await chat.save()
