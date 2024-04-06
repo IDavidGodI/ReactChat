@@ -1,32 +1,3 @@
-body, * {
-  color: #dddddd;
-  background-color: #222222;
-}
-
-
-
-
-
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
-
-.user_status::before{
-  content: "";
-    display: inline-block;
-    width: 10px;
-    height: 10px;
-    background-color: #777;
-    border-radius: 50%; 
-    margin-right: 0.3em
-}
-.chat-button:hover{
-  background-color: #555555;
-
-}
-.user_status.online::before{
-  background-color: #afd
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
