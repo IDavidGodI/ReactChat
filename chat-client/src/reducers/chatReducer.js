@@ -14,7 +14,6 @@ const chatReducer = createSlice({
       state.selectedChat = action.payload
     },
     addMessage: (state, action) => {
-      console.log(action.payload)
       state.messagesHistory.push(action.payload)
     }
   }

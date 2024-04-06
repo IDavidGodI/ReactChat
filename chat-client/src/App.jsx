@@ -5,12 +5,12 @@ import { loadUser, setField, setLoggedIn, setUser } from "./reducers/userReducer
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import usersService from "./services/usersService.js"
 import { useEffect } from "react"
-import { addMessage, setMessage, setSelectedChat } from "./reducers/chatReducer.js"
+import { setMessage, setSelectedChat } from "./reducers/chatReducer.js"
 
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from "react-router-dom"
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom"
 import chatService from "./services/chatService.js"
 import { useMemo } from "react"
-
+import store from "./store.js"
 const socket = io(environment.server, { autoConnect: false })
 
 
@@ -48,46 +48,69 @@ const Login = () => {
 
 const ChatButton = ({ user }) => {
   const dispatch = useDispatch()
-  const navigate = useNavigate()
+  const {selectedChat} = useSelector(state => state.chat)
   const handleSelection = () => {
-    dispatch(setSelectedChat(user.id))
+    if (selectedChat===user.id) dispatch(setSelectedChat(null))
+    else dispatch(setSelectedChat(user.id))
+    dispatch(setMessage(""))
   }
   return (
     <div className="chat-button" onClick={handleSelection}>
-      <h5 style={{ marginBottom: "1px" }}>{user.userName}</h5>
+      <h5 style={{ marginBottom: "1px" }}>{user.userName} ({user.new_messages && user.new_messages})</h5>
       <p className={`user_status ${user.online ? "online" : ""}`} >{user.online ? "online" : "offline"}</p>
     </div >
   )
 }
 
 const Message = ({ message }) => {
+
   return (
     <div>
-      {message.from.userName}: {message.content}
+      {message.from}: {message.content} ({message.status})
     </div>
   )
 }
-const MessagesDisplay = () => {
-  const {messageHistory, selectedChat} = useSelector(state => state.chat)
+const MessagesDisplay = ({user}) => {
+  const {selectedChat} = useSelector(state => state.chat)
   const queryClient = useQueryClient()
   const users = queryClient.getQueryData(["chats"])
   const selectedUser = users.find(u => u.id === selectedChat)
   const messages = useQuery({
     queryKey: ["messagesHistory"],
-    queryFn: () => chatService.getMessages(selectedUser.chatId)
+    queryFn: async () => {
+      return chatService.getMessages(selectedUser.chatId)
+    },
+    initialData: [],
+    refetchOnWindowFocus: false,
+    retry: 0
   })
+  useEffect(()=> {
+    if (selectedChat){
+      messages.refetch()
+    }
+  }, [selectedChat])
 
+  useMemo(()=>{
+    const not_read = messages.data.find(m => m.status!=="read" && m.to===user.id)
+    if (selectedChat && messages.data.length>0 && !!not_read){
+      
+      socket.emit("message_status", {
+        users: [selectedChat, user.id],
+        toAllMessages: true,
+        status: "read"
+      })
+    }
+  }, [messages])
+
+
+  if (messages.isError){
+    queryClient.refetchQueries({exact:["chats"]})
+  }
   return (
     <div>
       {
         messages.isSuccess &&
-        messages.data.map(message => {
-          const from_user = users.find(u => u.id === message.from)
-          console.log("from: ", from_user)
-          const newMessage = { ...message, from: from_user }
-          return (
-            <Message key={newMessage.timeStamp} message={newMessage} />)
-        })
+        messages.data.map(message => <Message key={message._id} message={message} />)
       }
     </div>
   )
@@ -96,16 +119,22 @@ const MessagesDisplay = () => {
 const MessageBox = ({ user }) => {
   const dispatch = useDispatch()
   const { selectedChat, messageBox } = useSelector(state => state.chat)
+  const queryClient = useQueryClient()
   const handleSend = (e) => {
     e.preventDefault()
     const timeStamp = new Date()
-
+    dispatch(setMessage(""))
     socket.emit("message", {
       from: user.id,
       to: selectedChat,
       content: messageBox,
-      timeStamp: timeStamp.toString()
+      timeStamp: timeStamp
     })
+    console.log("emitiendo")
+    const chats = [...queryClient.getQueryData(["chats"])]
+    const updateChat = chats.findIndex(c => c.id === selectedChat)
+    chats[updateChat] = {...chats[updateChat], last_activity: timeStamp}
+    queryClient.setQueryData(["chats"], chats)
   }
   return (
     <form onSubmit={handleSend}>
@@ -118,7 +147,13 @@ const MessageBox = ({ user }) => {
   )
 }
 const Chat = ({ to, user }) => {
-  console.log("to: ",to)
+  const queryClient = useQueryClient();
+  const {selectedChat} = useSelector(state => state.chat)
+  useEffect(()=>{
+    return ()=>{
+      queryClient.setQueryData(["messagesHistory"], [])
+    }
+  },[])
 
 
   return (
@@ -126,7 +161,7 @@ const Chat = ({ to, user }) => {
       <div>
         <h3>{to.userName}</h3>
       </div>
-      <MessagesDisplay />
+      <MessagesDisplay user={user}/>
       <MessageBox user={user} />
     </div>
   )
@@ -138,27 +173,60 @@ const ChatPage = () => {
   const navigate = useNavigate()
   const dispatch = useDispatch()
   const localUser = useSelector(state => state.user.user)
-  const selectedChat = useSelector(state => state.chat.selectedChat)
+  const {selectedChat} = useSelector(state => state.chat)
   const chats = useQuery({
     queryKey: ["chats"],
     queryFn: () => chatService.getChats(localUser),
     refetchOnWindowFocus: false,
+    initialData: []
   })
   const queryClient = useQueryClient()
-  useEffect(() => {
-    socket.on("state_change", () => {
-      chats.refetch()
 
+
+  useEffect(() => {
+    socket.on("state_change", async () => {
+      const {selectedChat} = store.getState().chat
+      const res = await chatService.getChats(localUser)
+      const { data } = await chats.refetch()
+      const selectedUser = data.find(d => d.id===selectedChat)
+      console.log("estado cambiado")
+      if (!selectedUser) dispatch(setSelectedChat(null))
     })
 
     socket.on("message", message => {
-      console.log("new message", message)
       const messagesHistory = queryClient.getQueryData(["messagesHistory"])
-      if (messagesHistory)
-      queryClient.setQueryData(["messagesHistory"], messagesHistory.concat(message))
-    })
-  }, [])
+      const { selectedChat } = store.getState().chat
+      const isChat = selectedChat===message.from || localUser.id===message.from
+      if (message.from!==localUser.id)
+        socket.emit("message_status", {
+          users: [message.from, message.to],
+          messageId: message._id,
+          status: isChat? "read" : "received"
+        })
+      if (isChat){
+        console.log("nuevo mensaje renderizado")
 
+        queryClient.setQueryData(["messagesHistory"], messagesHistory.concat(message))
+        return
+      }
+      
+        console.log("nuevo mensaje a parte")
+      
+      queryClient.refetchQueries({exact: ["chats"]})
+    })
+    socket.on("message_status", (from) => {
+      const { selectedChat } = store.getState().chat
+      if (selectedChat!==from){return}
+      queryClient.refetchQueries({exact: ["messagesHistory"]})
+    })
+    return () => {
+      dispatch(setSelectedChat(null))
+      queryClient.setQueryData(["chats"], [])
+    }
+  }, [])
+  useEffect(()=>{
+    queryClient.setQueryData(["messagesHistory"],[])
+  }, [selectedChat])
   const handleLogout = () => {
     localStorage.clear()
     dispatch(loadUser())
@@ -169,8 +237,12 @@ const ChatPage = () => {
   }
   let chat_list 
   if (chats.isSuccess){
-    console.log("query usuarios: ", chats.data)
-    chat_list = chats.data.filter(u => u.id!==localUser.id)
+    chat_list = [...chats.data]
+    .filter(u => u.id!==localUser.id)
+    .sort(
+      (a,b) => 
+        new Date(b.last_activity) - new Date(a.last_activity)
+    )
   }
   return (<>
     <button onClick={handleLogout}>Logout</button>
@@ -182,7 +254,7 @@ const ChatPage = () => {
       }
     </div>
     {selectedChat && chats.isSuccess &&
-      <Chat key={selectedChat} to={chat_list.find(u => u.id === selectedChat)} user={localUser} />
+      <Chat to={chat_list.find(u => u.id === selectedChat)} user={localUser} />
     }
   </>)
 }
@@ -194,18 +266,16 @@ const App = () => {
   useEffect(() => {
     if (!user) {
       dispatch(loadUser())
-      console.log("not user")
     }
     if (user) {
-      console.log("userrrr")
       socket.connect()
       socket.emit("login", user)
-      // socket.on("badUser", error => {
-      //   dispatch(setUser(null))
-      //   socket.disconnect()
-      // })
+      socket.on("badUser", error => {
+        dispatch(setUser(null))
+        socket.disconnect()
+        socket.removeAllListeners()
+      })
       socket.once("login", res => {
-        console.log("logiando")
         dispatch(setLoggedIn(true))
         navigate("/chats")
       })
@@ -213,9 +283,9 @@ const App = () => {
     return (() => {
       console.log("cerrando conexion")
       socket.disconnect()
+      socket.removeAllListeners()
     })
   }, [user])
-  console.log("rendering")
   return (
     <div>
       <Routes>
