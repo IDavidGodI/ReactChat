@@ -32,7 +32,7 @@ app.get("/", async (req, res) => {
   const users = await User.find({})
   const user = users[0]?.toJSON();
   
-  console.log(user)
+  res.send(";)")
 })
 
 app.post("/:user", async (req, res) => {
