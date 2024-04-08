@@ -364,7 +364,7 @@ const ChatPage = () => {
     <button className="bg-emerald-800 font-bold hover:bg-emerald-700 p-2 px-4 rounded" onClick={handleLogout}>Logout</button>
 
   </div>
-    <div className="flex h-full w-full">
+    <div className="flex min-h-0 grow w-full">
       <div className="w-1/5 flex flex-col items-start bg-teal-900 shadow-lg">
         {chats.isSuccess && chat_list.map(user => <ChatButton key={user.id} user={user} />)
         }
